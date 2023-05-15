@@ -13,17 +13,17 @@ from main import MultiGP
 
 # prepare data
 data = Data("/home/u1980907/Documents/Academia/Research/datasets/ml_test_res",
-            200,
+            50,
             [2,5])
 
-data.getStressStrain()
+data.getStressStrain(glue=1000)
 data.shareData(numshare=2)
 
 # build machine learning model
 multi = MultiGP(data.stress_strain)
 
 multi.trainStopping(10)
-num_procs = 3 # multi.numcs
+num_procs = 3 # multi.numc
 multi.trainCurves(curve_range=num_procs)
 
 # Use machine learning models for plotting

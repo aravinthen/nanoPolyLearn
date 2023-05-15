@@ -23,7 +23,7 @@ class Data:
         self.stress_strain = {}
         self.max_ext = None
 
-    def getStressStrain(self, remove_lt0=False):
+    def getStressStrain(self, remove_lt0=False, glue=0):
         ststdata = {}
         dpath = self.path2file
         folders = os.listdir(dpath)
@@ -46,8 +46,9 @@ class Data:
                     data = [j.split('\t') for j in ([i.strip() for i in df][1:])]
 
                     # correct for data points
-                    data=data[::self.points]
-
+                    mid = [data[i] for i in range(glue, len(data)-glue)][::self.points]
+                    data = data[0:glue] + mid + data[len(data)-glue:len(data)]                    
+                    
                     stress_strain = [] 
                     for line in data:
                         data_point = [float(line[i]) for i in self.indices]
