@@ -21,6 +21,7 @@ class Data:
         self.points = points
         self.indices = indices
         self.stress_strain = {}
+        self.max_ext = None
 
     def getStressStrain(self, remove_lt0=False):
         ststdata = {}
@@ -64,6 +65,14 @@ class Data:
                     index+=1
 
             ststdata[max_ext] = all_stress
+
+        # preprocessing.
+        # there is no need to use the first loading curve for every extension.
+        # the final (maximum) extension is more than enough.
+        self.max_ext = max([i for i in ststdata])
+        for i in ststdata:
+            if i != self.max_ext:
+                ststdata[i][1] = [] # empty the list but don't remove it
 
         self.stress_strain = ststdata
 
@@ -110,41 +119,41 @@ class MultiGP:
 
         return reduced        
         
-    def trainStopping(self, ):
+    def trainStopping(self, count):
         X = []
         y = []
         for i in range(0, self.numcs, 2):
             dataset = self.curve_select(self.data, i)
             for curve in dataset:
+                points = dataset[curve]
+                avg_points = sum([points[p][0]
+                                  for p in range(len(points)-count, len(points))])/count
+                print(avg_points)
                 X.append([curve, i])
-                y.append(dataset[curve][-1][0])
+                y.append(avg_points)
 
         X = np.stack(np.array(X))
         y = np.array(y)
         
-        kernel = RBF([5,5], (1e-2, 1e2)) + WhiteKernel(noise_level=1, noise_level_bounds=(1e-3, 1e-1))
+        kernel = RBF([5,5], (1e-2, 1e2)) # + WhiteKernel(noise_level=1, noise_level_bounds=(1e-3, 1e-1))
         
         self.stopping = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=100)
         self.stopping.fit(X, y)
         print("Stopping distances fitted.")
 
-    def trainCurves(self,):
-        label = 1
-        for i in range(self.numcs):
-            dataset = self.curve_select(self.data, i+1)
+    def trainCurves(self, curve_range=None):
+        if curve_range == None:
+            curve_range = self.numcs
+            
+        for i in range(1, curve_range+1):
+            dataset = self.curve_select(self.data, i)
 
             X = []
             y = []
-
-            x1 = []
-            x2 = []
-
             for curve in dataset:
                 for point in dataset[curve]:
                     X.append([curve, point[0]])
                     y.append(point[1])
-                    x1.append(point[0])
-                    x2.append(point[1])
 
             X = np.stack(np.array(X))
             y = np.array(y)
@@ -154,9 +163,8 @@ class MultiGP:
             
             gp = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=100)            
             gp.fit(X, y)
+            
             print(f"Curve {i} fitted.")
-
-            self.gps[label] = gp
-            label += 1
+            self.gps[i] = gp
 
         print("All curve models trained!")        
