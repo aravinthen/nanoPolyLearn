@@ -47,7 +47,10 @@ class Data:
 
                     # correct for data points
                     mid = [data[i] for i in range(glue, len(data)-glue)][::self.points]
-                    data = data[0:glue] + mid + data[len(data)-glue:len(data)]                    
+                    new_data = data[0:glue] + mid + data[len(data)-glue:len(data)]
+
+                    if len(new_data) < len(data):
+                        data = new_data
                     
                     stress_strain = [] 
                     for line in data:
@@ -92,7 +95,61 @@ class Data:
 
                 self.stress_strain[i][c] = curve1
                 self.stress_strain[i][c+1] = curve2
-    
+
+    # PLOTTING LIBRARIES ------------------------------------------------------------------
+    def viewc(self, index):        
+        def curve_select(alldata, index):
+            # alldata should be a dictionary that contains multiple dictionaries.
+            # those dictionaries should have an index corresponding to a given part of the motion
+            # The output of this function should be a reduced version of all data.
+            # Key: unloading point
+            # Data: all the data associated with the relevant index
+
+            reduced = {}
+            for unloading in alldata:
+                for i in alldata[unloading]:
+                    if i == index:
+                        reduced[unloading] = alldata[unloading][i]
+                
+            return reduced
+        
+        # view only the curves marked by the index.
+        data = curve_select(self.stress_strain, index)
+        
+        for i in data:
+            strain = []
+            stress = []
+            for point in data[i]:
+                strain.append(point[0])
+                stress.append(point[1])
+
+            plt.plot(strain, stress)
+            plt.show()
+
+    def viewall(self,):
+        def point2list(alldata, index):
+            # this converts a list of points into two lists representing axes
+            stress = []
+            strain = []
+            for data in alldata[index]:
+                for point in alldata[index][data]:
+                    strain.append(point[0])
+                    stress.append(point[1])
+
+            return stress, strain
+
+        # view all the data in the ststdata dictionary.
+        for i in self.stress_strain:
+            # obtain the first curve up to the maximum of the stress_strain curve
+            initstress = [p[1] for p in self.stress_strain[self.max_ext][1] if p[0] < i]
+            initstrain = [p[0] for p in self.stress_strain[self.max_ext][1] if p[0] < i]
+
+            print(i, len(initstrain), len(initstress))
+            plt.plot(initstrain, initstress, "-")
+            
+            stress, strain = point2list(self.stress_strain, i)
+            plt.plot(strain, stress, "-")
+            plt.show()
 
 class MultiGP:
     def __init__(self, data):
@@ -126,16 +183,13 @@ class MultiGP:
         for i in range(0, self.numcs, 2):
             dataset = self.curve_select(self.data, i)
             for curve in dataset:
-                points = dataset[curve]
-                avg_points = sum([points[p][0]
-                                  for p in range(len(points)-count, len(points))])/count
-                print(avg_points)
+                points = dataset[curve][-count:]
                 X.append([curve, i])
-                y.append(avg_points)
+                y.append([i[0] for i in points])
 
         X = np.stack(np.array(X))
         y = np.array(y)
-        
+
         kernel = RBF([5,5], (1e-2, 1e2)) # + WhiteKernel(noise_level=1, noise_level_bounds=(1e-3, 1e-1))
         
         self.stopping = GaussianProcessRegressor(kernel=kernel, n_restarts_optimizer=100)
